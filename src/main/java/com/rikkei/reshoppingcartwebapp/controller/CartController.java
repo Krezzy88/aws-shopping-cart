@@ -15,7 +15,7 @@ public class CartController {
         this.cartService = cartService;
     }
 
-    // Thêm sản phẩm
+    // Add a product to the cart
     @PostMapping("/{cartId}/add/{productId}")
     public String addProductToCart(
             @PathVariable Integer cartId,
@@ -34,7 +34,7 @@ public class CartController {
         return "redirect:/";
     }
 
-    // Giảm số lượng
+    // Decrease item quantity
     @PostMapping("/item/{cartItemId}/decrease")
     public String decreaseQuantity(
             @PathVariable Integer cartItemId,
@@ -44,7 +44,7 @@ public class CartController {
         return "redirect:/";
     }
 
-    // Xóa 1 sản phẩm
+    // Remove one item
     @PostMapping("/item/{cartItemId}/remove")
     public String removeItem(
             @PathVariable Integer cartItemId,
@@ -54,7 +54,7 @@ public class CartController {
         return "redirect:/";
     }
 
-    // Xóa toàn bộ giỏ
+    // Clear the cart
     @PostMapping("/{cartId}/clear")
     public String clearCart(@PathVariable Integer cartId) {
 

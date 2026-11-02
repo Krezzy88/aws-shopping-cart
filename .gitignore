@@ -40,3 +40,15 @@ out/
 .env
 .env.prod
 .env.local
+
+### Terraform ###
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+crash.log
+
+### Python test artifacts ###
+__pycache__/
+*.py[cod]

@@ -38,7 +38,7 @@ public class CartService {
         return cartItemRepository.findByCartId(cartId);
     }
 
-    // Thêm sản phẩm mới vào giỏ
+    // Add a product to the cart
     public void addProductToCart(Integer cartId, Integer productId) {
         Cart cart = cartRepository.findById(cartId).orElseThrow();
         Product product = productRepository.findById(productId).orElseThrow();
@@ -48,10 +48,10 @@ public class CartService {
                 .orElse(null);
 
         if (item != null) {
-            // đã có → tăng số lượng
+            // Increment the existing cart item
             item.setQuantity(item.getQuantity() + 1);
         } else {
-            // chưa có → tạo mới
+            // Create a new cart item
             item = new CartItem();
             item.setCart(cart);
             item.setProduct(product);
@@ -61,14 +61,14 @@ public class CartService {
         cartItemRepository.save(item);
     }
 
-    // Tăng số lượng
+    // Increase item quantity
     public void increaseProductQuantity(Integer cartItemId) {
         CartItem item = cartItemRepository.findById(cartItemId).orElseThrow();
         item.setQuantity(item.getQuantity() + 1);
         cartItemRepository.save(item);
     }
 
-    // Giảm số lượng
+    // Decrease item quantity
     public void decreaseProductQuantity(Integer cartItemId) {
         CartItem item = cartItemRepository.findById(cartItemId).orElseThrow();
 

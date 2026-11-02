@@ -36,3 +36,12 @@ HELP.md
 ### CI metadata (not needed inside image)
 .github/
 ci-cd.yaml
+
+### Deployment and infrastructure sources
+deploy/
+infra/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl

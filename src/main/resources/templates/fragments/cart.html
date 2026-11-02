@@ -3,16 +3,16 @@
   <body>
     <div th:fragment="cartView">
       <h4 class="badge-pill badge-light mt-3 mb-3 p-2 text-center">
-        Giỏ hàng
+        Shopping Cart
       </h4>
 
       <table class="table table-bordered">
         <thead>
           <tr>
-            <th>Sản phẩm</th>
-            <th>SL</th>
-            <th>Thành tiền</th>
-            <th>Hành động</th>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Subtotal</th>
+            <th>Actions</th>
           </tr>
         </thead>
 
@@ -26,11 +26,11 @@
               th:text="${#numbers.formatDecimal(
                 item.product.price * item.quantity,
                 0,'COMMA',0,'POINT'
-              )} + ' VNĐ'"
+              )} + ' VND'"
             ></td>
 
             <td>
-              <!-- TĂNG SỐ LƯỢNG -->
+              <!-- Increase quantity -->
               <form
                 th:action="@{/cart/item/{id}/increase(id=${item.id})}"
                 method="post"
@@ -40,7 +40,7 @@
                 <button class="btn btn-sm btn-success">+</button>
               </form>
 
-              <!-- GIẢM SỐ LƯỢNG -->
+              <!-- Decrease quantity -->
               <form
                 th:action="@{/cart/item/{id}/decrease(id=${item.id})}"
                 method="post"
@@ -50,7 +50,7 @@
                 <button class="btn btn-sm btn-warning">-</button>
               </form>
 
-              <!-- XÓA SẢN PHẨM -->
+              <!-- Remove product -->
               <form
                 th:action="@{/cart/item/{id}/remove(id=${item.id})}"
                 method="post"
@@ -64,18 +64,18 @@
         </tbody>
       </table>
 
-      <!-- TỔNG TIỀN GIỎ HÀNG -->
+      <!-- Cart total -->
       <p class="text-right font-weight-bold">
-        Tổng tiền:
+        Total:
         <span
-          th:text="${#numbers.formatDecimal(totalAmount,0,'COMMA',0,'POINT')} + ' VNĐ'"
+          th:text="${#numbers.formatDecimal(totalAmount,0,'COMMA',0,'POINT')} + ' VND'"
         ></span>
       </p>
 
-      <!-- XÓA TOÀN BỘ GIỎ HÀNG -->
+      <!-- Clear cart -->
       <form th:action="@{/cart/{id}/clear(id=${cartId})}" method="post">
         <button class="btn btn-outline-danger btn-sm">
-          Xóa toàn bộ giỏ hàng
+          Clear Cart
         </button>
       </form>
     </div>

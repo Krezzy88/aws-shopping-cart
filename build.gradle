@@ -1,6 +1,7 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.1'
+	id 'jacoco'
+	id 'org.springframework.boot' version '4.0.9'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -22,14 +23,46 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'io.github.cdimascio:java-dotenv:5.2.2'
 	runtimeOnly 'com.mysql:mysql-connector-j'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-mysql'
+	testImplementation 'org.testcontainers:testcontainers-jdbc'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+jacoco {
+	toolVersion = '0.8.13'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: ['**/model/**', '**/ReShoppingCartWebAppApplication*'])
+	}))
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn tasks.named('jacocoTestReport')
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: ['**/model/**', '**/ReShoppingCartWebAppApplication*'])
+	}))
+	violationRules {
+		rule {
+			limit {
+				minimum = 0.95
+			}
+		}
+	}
 }

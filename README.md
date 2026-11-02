@@ -1,115 +1,120 @@
-# RE Shopping Cart
+# AWS Shopping Cart — DevOps Portfolio
 
-A containerized Spring Boot shopping-cart demo with a GitHub Actions pipeline for building and deploying to an AWS EC2 instance.
+This repository packages a small Spring Boot shopping-cart demo and adds a reviewable DevOps workflow around it: automated tests, container health checks, security scanning, a commit-tagged CI/CD pipeline, rollback automation, and Terraform for a demo EC2 host. The application is intentionally simple; the infrastructure and delivery practices are the focus. CI configuration exists in the repository, but a successful live AWS deployment has **not** been verified by this project session.
 
-## What it does
+## What this repository adds
 
-- Displays products loaded from MySQL.
-- Adds products to a cart, changes quantities, removes items, and clears the cart.
-- Calculates the cart total.
-- Uses Spring MVC, Thymeleaf, Spring Data JPA, and MySQL.
+| Area | Contribution in this repository | Verification status |
+| --- | --- | --- |
+| Automated checks | Service/controller unit tests, MySQL Testcontainers integration tests, JaCoCo line-coverage gate, and mocked deployment-script tests | 22 Java tests and 8 deploy-script tests passed locally; 98.46% measured line coverage |
+| Container | Multi-stage Java 21 image, non-root runtime user, OCI metadata, and HTTP liveness health check | Compose startup, database readiness, HTTP page response, and non-root container verified locally |
+| CI/CD | Pull-request checks, dependency/configuration scans, immutable commit-SHA image tags, production environment deploy, readiness check, rollback, and manual rollback workflow | Workflows linted; no GitHub Actions run or AWS deploy verified |
+| Infrastructure as code | Terraform definition for EC2, restricted SSH ingress, encrypted root volume, IMDSv2, and a monthly budget alert | `fmt` and `validate` passed; not applied to AWS |
+| Operations | Deployment runbook, architecture decisions, findings, and evidence log | Included in `docs/` |
 
-This is a demo application, not a production-ready commerce platform. The home page is wired to the sample cart with ID `1`; there is no authentication, user-specific cart selection, payment processing, or inventory management.
+## Scope and limitations
+
+The original web application displays products and supports basic cart operations backed by MySQL. The home page uses a fixed sample cart ID. There is no authentication, user-specific cart selection, payment processing, inventory management, or production-ready security model.
+
+The deployment target is one EC2 instance and one container. Container replacement can cause downtime. Terraform describes demo infrastructure, not a production VPC/database architecture; the DB remains external and must be created and secured separately. GitHub-hosted runner IPs are not suitable for a small fixed SSH allowlist; use a controlled static-egress runner or redesign the deployment around AWS Systems Manager rather than opening SSH globally.
 
 ## Architecture
 
-```text
-Browser
-  -> EC2 instance (Docker, port 8080)
-       -> Spring Boot application (Java 21)
-            -> External MySQL database
-
-GitHub Actions (push to main)
-  -> Gradle tests
-  -> Docker image -> Docker Hub
-  -> SSH -> EC2 pulls and starts the image
+```mermaid
+flowchart LR
+    Browser --> EC2["AWS EC2<br/>Docker / port 8080"]
+    EC2 --> App["Spring Boot<br/>Java 21"]
+    App --> MySQL["External MySQL"]
+    Actions["GitHub Actions"] -->|SSH deploy| EC2
+    Actions -->|push commit-tagged image| Hub["Docker Hub"]
+    EC2 -->|pull image| Hub
 ```
 
-The database is external to EC2. The current workflow does not provision AWS resources, create a database, or configure networking; those must be set up separately.
+## CI/CD pipeline
 
-## Technology
+```mermaid
+flowchart LR
+    PR["Pull request"] --> Tests["Unit + MySQL integration tests<br/>coverage gate"]
+    PR --> FSScan["Trivy filesystem scan"]
+    Push["Push to main"] --> Tests
+    Push --> FSScan
+    Tests --> Build["Build image"]
+    FSScan --> Build
+    Build --> ImageScan["Trivy critical vulnerability scan"]
+    ImageScan --> Publish["Publish commit SHA + latest tags"]
+    Publish --> Deploy["Production environment<br/>SSH deploy"]
+    Deploy --> Ready{"Database-backed<br/>readiness check"}
+    Ready -->|healthy| Done["Deployment complete"]
+    Ready -->|unhealthy| Rollback["Restore previous image<br/>and fail workflow"]
+```
 
-- Java 21 and Spring Boot
-- Gradle
-- MySQL and Spring Data JPA
-- Thymeleaf
-- Docker
-- GitHub Actions, Docker Hub, and AWS EC2
+The workflows are configuration, not evidence that these jobs have passed on GitHub. See [`docs/EVIDENCE.md`](docs/EVIDENCE.md) for what was and was not verified.
 
 ## Run locally
 
-Prerequisites: Java 21, Docker (for the container option), and a reachable MySQL database.
+Prerequisites: Java 21 and Docker Compose v2.
 
-1. Create a MySQL database and load the demo schema and sample data from [`src/main/resources/db/re_shopping_cart_db.sql`](src/main/resources/db/re_shopping_cart_db.sql). Run this script once against an empty database.
-2. Copy the environment template to the file for the profile you will use:
-
-   ```sh
-   cp .env.example .env.local
-   ```
-
-3. Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` in `.env.local`. `DB_URL` must be a JDBC URL for the database, for example `jdbc:mysql://<host>:3306/defaultdb`; use your database provider's required TLS parameters.
-4. Start the app:
-
-   ```sh
-   SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
-   ```
-
-   Visit [http://localhost:8080](http://localhost:8080).
-
-The application loads `.env.<profile>` (for example, `.env.local`) at startup. Environment variables and JVM system properties take precedence over values in that file. Do not commit populated environment files.
-
-### Run the container locally
-
-With `.env.local` populated and the database reachable from Docker:
+Start the app and MySQL:
 
 ```sh
-docker build -t re-shopping-cart-web-app .
-docker run --rm --name re-shopping-cart-web-app \
-  --env-file .env.local \
-  -p 8080:8080 \
-  re-shopping-cart-web-app
+docker compose up --build
 ```
 
-The container listens on port `8080`. It runs as a non-root user and expects the database to be provided externally.
+Open [http://localhost:8080](http://localhost:8080). The app container waits for MySQL health. The Compose database uses a named volume; remove it only when you want to delete local demo data:
 
-## AWS EC2 deployment
+```sh
+docker compose down
+docker compose down -v
+```
 
-The workflow in [`.github/workflows/ci-cd.yaml`](.github/workflows/ci-cd.yaml) runs on pushes to `main`. It tests the project, builds and pushes a Docker image to Docker Hub, then connects to EC2 over SSH to replace the running container. The deployed image is tagged with the commit SHA (and `latest` for convenience).
+The local database credentials in `compose.yaml` are for local development only and must not be reused in AWS.
 
-### Prerequisites
+## Run checks
 
-- An EC2 Linux instance with Docker installed, enough memory for the JVM, and access to the MySQL server.
-- A Docker Hub repository named `re-shopping-cart-web-app` under the configured Docker Hub username. The EC2 host must be able to pull it; for a private repository, configure Docker Hub authentication on EC2.
-- A MySQL database with the schema and sample data loaded. The database firewall must allow connections from the EC2 instance.
-- Security-group/network rules for the required traffic. Restrict SSH to trusted sources. Because GitHub-hosted runner IPs can change, consider a self-hosted runner or AWS Systems Manager rather than broadly exposing SSH. Expose port `8080` only as appropriate for your demo.
-- GitHub Actions secrets configured for the repository:
+```sh
+./gradlew --no-daemon clean test jacocoTestReport jacocoTestCoverageVerification
+python3 -m unittest discover -s deploy/tests
+```
 
-| Secret | Purpose |
+The JaCoCo gate is 95% line coverage for application code excluding plain JPA entities and the application bootstrap class. Integration tests use MySQL 8.4 through Testcontainers and are skipped when Docker is unavailable; a local test run without Docker does not validate the database integration. See the [evidence log](docs/EVIDENCE.md) for measured output.
+
+## Deploy and roll back
+
+Deployment is configured for pushes to `main`. Before enabling it:
+
+1. Review [the runbook](docs/RUNBOOK.md), [Terraform notes](infra/README.md), and cost/risk warnings.
+2. Obtain permission to republish the original application code and select a license.
+3. Configure a Docker Hub repository, an EC2 host with Docker and `curl`, an external MySQL database, and GitHub `production` environment secrets: `DOCKER_USER`, `DOCKER_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_KEY`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`.
+4. Ensure the chosen runner can reach SSH through a narrowly scoped security rule. Do not expose SSH to `0.0.0.0/0` to make hosted CI work.
+5. Configure a production environment reviewer if appropriate, then verify the first real Actions run, `/actuator/health/readiness`, `/`, and a cart operation.
+
+Use **Actions → Manual rollback** to deploy a previously published full commit SHA. The deploy script also attempts automatic rollback to the image that was running before a failed release. Details and troubleshooting steps are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
+**Terraform is not applied by CI or by the authoring agent.** It may create billable resources. The budget notification is not a spending cap. Read [`infra/README.md`](infra/README.md), verify current pricing and free-tier eligibility, and review the plan before any owner-run apply.
+
+## Security notes
+
+- Never commit credentials, private keys, populated `.env` files, or Terraform state.
+- GitHub Actions references are pinned to full commit SHAs; Dependabot is configured to propose updates.
+- The EC2 security group limits database egress to a configured CIDR/port. TCP/443 egress remains open for Docker Hub and OS updates and is the documented Trivy AWS-0104 exception; this is not fully restricted egress.
+- The deploy job passes database credentials to the remote container environment. Host administrators can inspect container configuration; treat host access as privileged and rotate credentials if exposed.
+- The app has no authentication and is for demo data only. See [`SECURITY.md`](SECURITY.md).
+- The Spring Boot plugin was upgraded to 4.0.9 after a local image scan identified critical vulnerabilities; rebuilding and rescanning the image found zero CRITICAL findings. The Trivy filesystem scan passed with the documented HTTPS-egress exception.
+- New database initialization uses English sample data. Existing persistent MySQL volumes do not rerun the initialization script automatically; update their sample rows manually if they should match the new English catalog.
+- Docker Compose and local health have been verified; GitHub workflow runs and live AWS deployment have not.
+
+## Origin & attribution
+
+The Java shopping-cart application originates from `daonguyendev`; the Git history credits that author for the application source. This repository has no license file, and permission to redistribute the original code has not been confirmed. Obtain permission and choose a license before publishing or sharing this repository as a public portfolio project.
+
+| Original application | DevOps additions in this repository |
 | --- | --- |
-| `DOCKER_USER` | Docker Hub account/repository namespace |
-| `DOCKER_TOKEN` | Docker Hub access token used to push images |
-| `EC2_HOST` | EC2 public DNS name or IP |
-| `EC2_USER` | SSH user on EC2 |
-| `EC2_KEY` | SSH private key accepted by EC2 |
-| `DB_URL` | MySQL JDBC connection URL |
-| `DB_USERNAME` | MySQL username |
-| `DB_PASSWORD` | MySQL password |
+| Spring MVC / Thymeleaf shopping-cart demo, JPA entities and repositories, product/cart services, and MySQL schema/seed | Automated tests and coverage gate; Testcontainers MySQL integration suite; Docker health check and local Compose setup; CI/CD and image scans; health-checked EC2 deployment with automatic/manual rollback; Terraform demo infrastructure; runbook, decisions, findings, and evidence documentation |
 
-Keep credentials in GitHub Actions secrets, not in the repository or image. The workflow currently publishes to Docker Hub and deploys by SSH; it does not use CodeDeploy, ECR, RDS provisioning, Terraform, a load balancer, or a zero-downtime strategy.
+## Project documentation
 
-## CI/CD and configuration notes
-
-- Java 21 is used by Gradle and the Docker build.
-- The app requires `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` at runtime.
-- The default server port is `8080`; set `SERVER_PORT` to override it.
-- Optional database pool and template settings are documented in [`.env.example`](.env.example).
-- The existing Spring context test is disabled, so a green test step does not currently represent active application test coverage. Add tests that can run without a live database (or configure a disposable test database) before relying on CI as a quality gate.
-- Deployment replaces the container on a single EC2 host, so a restart can cause downtime. There is no automated health check or rollback yet.
-
-## Resume description
-
-Use only claims that match what you have actually configured and successfully run. For example:
-
-> **AWS Shopping Cart Deployment** — Containerized a Java 21 / Spring Boot web application with Docker and implemented a GitHub Actions pipeline to build, publish versioned images to Docker Hub, and deploy to AWS EC2 over SSH. Configured runtime database credentials through GitHub Actions secrets and connected the application to MySQL.
-
-If you have not yet completed a successful deployment, describe the pipeline as implemented/configured rather than deployed. Do not describe this project as production-grade or claim AWS services that are not in use.
+- [Findings and known application limitations](docs/FINDINGS.md)
+- [Architecture decision records](docs/DECISIONS.md)
+- [Deployment runbook](docs/RUNBOOK.md)
+- [Verification evidence and owner-only TODOs](docs/EVIDENCE.md)
+- [Terraform setup and cost warning](infra/README.md)

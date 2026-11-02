@@ -48,14 +48,14 @@ ADD CONSTRAINT uk_cart_product UNIQUE (cart_id, product_id);
 -- USERS
 -- =====================
 INSERT INTO users (name) VALUES
-('Nguyen Van A');
+('Sample User');
 
 -- =====================
--- PRODUCTS (CHỈ 2 SẢN PHẨM)
+-- PRODUCTS (2 SAMPLE PRODUCTS)
 -- =====================
 INSERT INTO products (name, image_url, price) VALUES
-('Ốp điện thoại', 'op-dien-thoai.jpg', 155000),
-('Sạc điện thoại', 'cong-chuyen-usb.jpg', 150000);
+('Phone case', 'op-dien-thoai.jpg', 155000),
+('Phone charger', 'cong-chuyen-usb.jpg', 150000);
 
 -- =====================
 -- CARTS
@@ -65,8 +65,8 @@ INSERT INTO carts (user_id) VALUES
 -- cart_id = 1
 
 -- =====================
--- CART ITEMS (CHỈ 2 SẢN PHẨM)
+-- CART ITEMS (2 SAMPLE PRODUCTS)
 -- =====================
 INSERT INTO cart_items (cart_id, product_id, quantity) VALUES
-(1, 1, 4), -- Ốp điện thoại x4
-(1, 2, 1); -- Sạc điện thoại x1
+(1, 1, 4), -- Phone case x4
+(1, 2, 1); -- Phone charger x1
